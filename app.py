@@ -1,23 +1,9 @@
 
-from flask import Flask, send_from_directory
-import os
-
-app = Flask(__name__, static_folder='frontend')
-
-@app.route('/')
-def serve_index():
-    return send_from_directory(app.static_folder, 'index.html')
-
-@app.route('/<path:path>')
-def serve_static(path):
-    return send_from_directory(app.static_folder, path)
-
-from flask import Flask, request, jsonify
+from flask import Flask, send_from_directory, request, jsonify
 from flask_cors import CORS
 import math
-import random
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='frontend')
 CORS(app)
 
 TAXONOMY = ["Bacteria", "Fungi", "Plant", "Animal", "Protist"]
@@ -33,6 +19,27 @@ def calculate_shannon_index(counts):
             shannon -= p * math.log(p)
     return round(shannon, 3)
 
+# Deterministic taxonomy assignment based on sequence prefixes
+def assign_taxonomy(seq):
+    if seq.startswith('A'):
+        return "Animal"
+    elif seq.startswith('T'):
+        return "Plant"
+    elif seq.startswith('C'):
+        return "Bacteria"
+    elif seq.startswith('G'):
+        return "Fungi"
+    else:
+        return "Protist"
+
+@app.route('/')
+def serve_index():
+    return send_from_directory(app.static_folder, 'index.html')
+
+@app.route('/<path:path>')
+def serve_static(path):
+    return send_from_directory(app.static_folder, path)
+
 @app.route('/analyze', methods=['POST'])
 def analyze():
     file = request.files.get('file')
@@ -46,8 +53,10 @@ def analyze():
         return jsonify({"error": "Empty or invalid file content"}), 400
 
     taxonomy_counts = dict.fromkeys(TAXONOMY, 0)
+
+    # Assign taxonomy deterministically for consistency
     for seq in sequences:
-        taxon = random.choice(TAXONOMY)
+        taxon = assign_taxonomy(seq)
         taxonomy_counts[taxon] += 1
 
     species_richness = sum(1 for count in taxonomy_counts.values() if count > 0)
@@ -58,14 +67,6 @@ def analyze():
         "shannon_index": shannon_index,
         "taxonomy_counts": taxonomy_counts
     })
-#withou host
+
 if __name__ == '__main__':
     app.run(port=5000, debug=True)
-
-# #for host
-# if __name__ == "__main__":
-#     import os
-#     port = int(os.environ.get("PORT", 10000))
-#     app.run(host="0.0.0.0", port=port)
-
-
